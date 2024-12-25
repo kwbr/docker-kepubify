@@ -1,11 +1,11 @@
-#!/usr/bin/env bash
+#!/bin/sh
 
 set -euo pipefail
 
 path="/home/kepubify/files"
 file="$path/$1"
 
-kepubify \
+/kepubify \
     --verbose \
     --update \
     --output "$path" \

@@ -1,24 +1,26 @@
-FROM ubuntu:jammy AS builder
+# syntax=docker/dockerfile:1
 
-RUN apt-get update && apt-get install -y git build-essential curl wget golang
+# Build the application from source
+FROM docker.io/golang:alpine AS build-stage
 
-WORKDIR /usr/src
+WORKDIR /project
 
+RUN apk update && apk add --no-cache git
 # Clone the kepubify source code from the Github repository
 RUN git clone https://github.com/pgaskin/kepubify \
     && cd kepubify \
-    && go build ./cmd/kepubify
+    && CGO_ENABLED=0 GOOS=linux go build ./cmd/kepubify
 
-FROM ubuntu:latest AS release
+# Deploy the application binary into a lean image
+FROM gcr.io/distroless/base-debian11 AS build-release-stage
+
+# Our script needs /bin/sh, we copy it from busybox
+COPY --from=busybox:stable-uclibc /bin/sh /bin/sh
 
 # Copy the kepubify binary from the builder stage
-COPY --from=builder /usr/src/kepubify/kepubify /usr/local/bin
-
-RUN apt-get update && \
-  DEBIAN_FRONTEND=noninteractive TZ="America\Los_Angeles" \ 
-  && apt-get autoclean \
-  && rm -rf /var/lib/apt/lists/*
+COPY --from=build-stage /project/kepubify/kepubify /kepubify
 
 COPY scripts /home/kepubify
 WORKDIR /home/kepubify
-ENTRYPOINT ["/bin/bash", "/home/kepubify/entrypoint.sh"]
+USER nonroot:nonroot
+ENTRYPOINT ["/bin/sh", "/home/kepubify/entrypoint.sh"]
